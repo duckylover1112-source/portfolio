@@ -1,41 +1,55 @@
 name: Deploy to GitHub Pages
 
 on:
-  # Trigger the workflow every time you push to the `main` branch
-  # Using a different branch name? Replace `main` with your branch’s name
   push:
     branches: [ main ]
-  # Allows you to run this workflow manually from the Actions tab on GitHub.
   workflow_dispatch:
 
-# Allow this job to clone the repo and create a page deployment
 permissions:
   contents: read
   pages: write
   id-token: write
 
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout your repository using git
+      - name: Checkout repository
         uses: actions/checkout@v5
-      - name: Install, build, and upload your site
-        uses: bitovi/github-actions-react-to-github-pages
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
         with:
-          path: ./portfolio
-          node-version: 24
-          package-manager: pnpm@latest
-          build-cmd: pnpm run build
-        # env:
-          # PUBLIC_POKEAPI: 'https://pokeapi.co/api/v2'
+          node-version: 22
+          cache: npm
+          cache-dependency-path: portfolio/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./portfolio
+        run: npm ci
+
+      - name: Build project
+        working-directory: ./portfolio
+        run: npm run build
+
+      - name: Upload dist folder
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: ./portfolio/dist
 
   deploy:
     needs: build
     runs-on: ubuntu-latest
+
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
